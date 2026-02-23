@@ -250,17 +250,30 @@ http://your-domain.com/setup_odoo.php
 ```
 your-project/
 ├── functions_lib/
-│   ├── odoo.php          ← الملف الرئيسي (تكامل Odoo)
-│   ├── erp.php           ← دوال ERP الموحدة (erp_log, erp_save_log)
-│   ├── acc.php           ← يحتوي على einv_return
-│   └── lib/erp/          ← مكتبة ERP (Factory, Interface)
+│   ├── odoo.php              ← الملف الرئيسي (تكامل Odoo)
+│   ├── erp.php               ← دوال ERP الموحدة (erp_log, erp_save_log)
+│   ├── ERP_Odoo.php          ← كلاس Odoo لنظام Multi-ERP
+│   ├── acc.php               ← يحتوي على einv_return
+│   ├── erp_integ_log.sql     ← جدول سجلات التكامل
+│   ├── erp_lang_keys.sql     ← مفاتيح اللغة للرسائل
+│   └── lib/erp/              ← مكتبة ERP (Factory, Interface, Functions)
 ├── functions_libX/
-│   ├── odoo.php          ← نسخة احتياطية
-│   └── acc.php           ← نسخة احتياطية
+│   ├── odoo.php              ← نسخة احتياطية
+│   └── acc.php               ← نسخة احتياطية
+├── setup_odoo.php            ← إعداد حقول erp_id و metadata
+├── setup_erp_system.sql      ← إعداد sys_config و erp_integ_log (لـ Multi-ERP)
+├── admin_erp_settings.php    ← لوحة إعدادات ERP (اختياري)
 └── functions/
-    ├── connect.php       ← اتصال قاعدة البيانات
-    └── functions.php     ← الوظائف الأساسية
+    ├── connect.php           ← اتصال قاعدة البيانات
+    └── functions.php         ← الوظائف الأساسية
 ```
+
+#### ملفات SQL للتنفيذ (مرة واحدة):
+| الملف | الغرض |
+|-------|-------|
+| `functions_lib/erp_integ_log.sql` | إنشاء جدول سجلات التكامل `erp_integ_log` |
+| `functions_lib/erp_lang_keys.sql` | إضافة مفاتيح اللغة لرسائل Odoo و ERP |
+| `setup_erp_system.sql` | إعداد sys_config و erp_integ_log (لنظام Multi-ERP) |
 
 ---
 
