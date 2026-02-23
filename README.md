@@ -1,9 +1,22 @@
 # 🔗 دليل تكامل Odoo مع نظام سمات
 ## Odoo Integration Guide for Simaat System
 
-> **آخر تحديث:** 25 يناير 2026  
-> **الإصدار:** 2.0  
+> **آخر تحديث:** 23 فبراير 2026  
+> **الإصدار:** 2.1  
 > **الحالة:** جاهز للإنتاج ✅
+
+---
+
+## 📋 جدول المحتويات
+
+1. [نظرة عامة](#نظرة-عامة)
+2. [المتطلبات الأساسية](#المتطلبات-الأساسية)
+3. [خطوات التثبيت](#خطوات-التثبيت)
+4. [الوظائف المتاحة](#الوظائف-المتاحة)
+5. [الاستخدام](#الاستخدام)
+6. [أكواد الحالات](#أكواد-الحالات)
+7. [استكشاف الأخطاء](#استكشاف-الأخطاء)
+8. [الملفات المعدلة](#الملفات-المعدلة)
 
 ---
 
@@ -15,7 +28,7 @@
 - ✅ إرسال الفواتير إلى Odoo
 - ✅ مزامنة العقود والوحدات والأقساط
 - ✅ إنشاء عملاء جدد تلقائياً عند الحاجة
-- ✅ حفظ معرفات Odoo في الحقل الموحد `erp_odoo_id`
+- ✅ حفظ معرفات Odoo في الحقل الموحد `erp_id`
 
 ### كيف يعمل؟
 ```
@@ -24,7 +37,7 @@
 │  (Invoice)  │  POST   │ Integration  │  Sync   │    ERP      │
 └─────────────┘         └──────────────┘         └─────────────┘
        │                                                  │
-       │ ◄────────────── erp_odoo_id ────────────────────┘
+       │ ◄────────────── erp_id ────────────────────┘
        │                (Save ID back)
        ▼
   Update Status
@@ -54,16 +67,18 @@ $odoo_api_key = 'your_api_key';
 - `res_client` - العملاء
 - `plt_einv` - الفواتير الإلكترونية (إيجارات)
 - `scm_einv` - الفواتير الإلكترونية (صيانة/مبيعات)
-- `acc_property` - العقارات
-- `acc_unit` - الوحدات
-- `plt_tmt` - العقود
-- `plt_installments` - الأقساط
+- `plt_prop` / `acc_property` - العقارات
+- `plt_are` / `acc_unit` - الوحدات
+- `plt_tts` - العقود
+- `plt_tmt` - الأقساط/المستحقات
+
+**ملاحظة:** إذا كان مشروعك يستخدم `acc_property` أو `acc_unit`، أضف `erp_id` لتلك الجداول. الكود يستخدم `plt_prop` و `plt_are` لمزامنة العقارات والوحدات.
 
 ---
 
 ## 🚀 خطوات التثبيت
 
-### الخطوة 1️⃣: إضافة حقل `erp_odoo_id` لقاعدة البيانات
+### الخطوة 1️⃣: إضافة حقل `erp_id` لقاعدة البيانات
 
 قم بتشغيل السكريبت التالي **مرة واحدة فقط**:
 
@@ -71,55 +86,58 @@ $odoo_api_key = 'your_api_key';
 
 ```sql
 -- ===================================================================
--- إضافة حقل erp_odoo_id لجميع الجداول المطلوبة
--- Add erp_odoo_id field to all required tables
+-- إضافة حقل erp_id لجميع الجداول المطلوبة
+-- Add erp_id field to all required tables
 -- ===================================================================
 
 -- 1. جدول العملاء (Clients)
 ALTER TABLE `res_client` 
-ADD COLUMN `erp_odoo_id` INT(11) NULL DEFAULT NULL COMMENT 'Odoo Partner ID' 
+ADD COLUMN `erp_id` INT(11) NULL DEFAULT NULL COMMENT 'Odoo Partner ID' 
 AFTER `client_id`;
 
 -- 2. جدول الفواتير الإلكترونية - إيجارات (E-Invoices - Rent)
 ALTER TABLE `plt_einv` 
-ADD COLUMN `erp_odoo_id` INT(11) NULL DEFAULT NULL COMMENT 'Odoo Invoice ID' 
+ADD COLUMN `erp_id` INT(11) NULL DEFAULT NULL COMMENT 'Odoo Invoice ID' 
 AFTER `einv_id`;
 
 -- 3. جدول الفواتير الإلكترونية - صيانة/مبيعات (E-Invoices - Maintenance/Sales)
 ALTER TABLE `scm_einv` 
-ADD COLUMN `erp_odoo_id` INT(11) NULL DEFAULT NULL COMMENT 'Odoo Invoice ID' 
+ADD COLUMN `erp_id` INT(11) NULL DEFAULT NULL COMMENT 'Odoo Invoice ID' 
 AFTER `einv_id`;
 
 -- 4. جدول العقارات (Properties)
 ALTER TABLE `acc_property` 
-ADD COLUMN `erp_odoo_id` INT(11) NULL DEFAULT NULL COMMENT 'Odoo Property ID' 
+ADD COLUMN `erp_id` INT(11) NULL DEFAULT NULL COMMENT 'Odoo Property ID' 
 AFTER `property_id`;
 
 -- 5. جدول الوحدات (Units)
 ALTER TABLE `acc_unit` 
-ADD COLUMN `erp_odoo_id` INT(11) NULL DEFAULT NULL COMMENT 'Odoo Unit ID' 
+ADD COLUMN `erp_id` INT(11) NULL DEFAULT NULL COMMENT 'Odoo Unit ID' 
 AFTER `unit_id`;
 
 -- 6. جدول العقود (Contracts)
 ALTER TABLE `plt_tmt` 
-ADD COLUMN `erp_odoo_id` INT(11) NULL DEFAULT NULL COMMENT 'Odoo Contract ID' 
+ADD COLUMN `erp_id` INT(11) NULL DEFAULT NULL COMMENT 'Odoo Contract ID' 
 AFTER `tmt_id`;
 
 -- 7. جدول الأقساط (Installments)
 ALTER TABLE `plt_installments` 
-ADD COLUMN `erp_odoo_id` INT(11) NULL DEFAULT NULL COMMENT 'Odoo Installment ID' 
+ADD COLUMN `erp_id` INT(11) NULL DEFAULT NULL COMMENT 'Odoo Installment ID' 
 AFTER `installment_id`;
 
 -- 8. إضافة فهرس (Index) لتحسين الأداء
-ALTER TABLE `res_client` ADD INDEX `idx_erp_odoo_id` (`erp_odoo_id`);
-ALTER TABLE `plt_einv` ADD INDEX `idx_erp_odoo_id` (`erp_odoo_id`);
-ALTER TABLE `scm_einv` ADD INDEX `idx_erp_odoo_id` (`erp_odoo_id`);
+ALTER TABLE `res_client` ADD INDEX `idx_erp_id` (`erp_id`);
+ALTER TABLE `plt_einv` ADD INDEX `idx_erp_id` (`erp_id`);
+ALTER TABLE `scm_einv` ADD INDEX `idx_erp_id` (`erp_id`);
 
 -- ✅ تم بنجاح!
 SELECT 'Setup completed successfully!' AS Status;
 ```
 
 **⚠️ ملاحظة:** إذا كانت بعض الجداول لا تحتوي على الأعمدة المذكورة بعد `AFTER`، قم بحذف جزء `AFTER` من الأمر.
+
+#### جدول سجلات التكامل (اختياري - للمتابعة)
+إذا أردت حفظ سجلات عمليات التكامل في قاعدة البيانات، شغّل `functions_lib/erp_integ_log.sql` أو `setup_erp_system.sql`.
 
 ---
 
@@ -132,8 +150,8 @@ SELECT 'Setup completed successfully!' AS Status;
 ```php
 <?php
 /**
- * Setup Odoo Integration - Add erp_odoo_id field metadata
- * تشغيل مرة واحدة فقط لإضافة بيانات الحقل erp_odoo_id
+ * Setup Odoo Integration - Add erp_id field metadata
+ * تشغيل مرة واحدة فقط لإضافة بيانات الحقل erp_id
  */
 
 require_once 'functions/connect.php';
@@ -153,16 +171,16 @@ $tables = [
 echo "🚀 Starting Odoo Integration Setup...\n\n";
 
 // 1. إضافة الحقول
-echo "Step 1: Adding erp_odoo_id columns...\n";
+echo "Step 1: Adding erp_id columns...\n";
 foreach ($tables as $table) {
-    $check = @jitquery("SHOW COLUMNS FROM `$table` LIKE 'erp_odoo_id'", -1);
+    $check = @jitquery("SHOW COLUMNS FROM `$table` LIKE 'erp_id'", -1);
     
     if (empty($check)) {
-        echo "  → Adding erp_odoo_id to $table...";
-        $result = @jitquery("ALTER TABLE `$table` ADD COLUMN `erp_odoo_id` INT(11) NULL DEFAULT NULL COMMENT 'Odoo ID'", -1);
+        echo "  → Adding erp_id to $table...";
+        $result = @jitquery("ALTER TABLE `$table` ADD COLUMN `erp_id` INT(11) NULL DEFAULT NULL COMMENT 'Odoo ID'", -1);
         echo " ✅\n";
     } else {
-        echo "  ✓ erp_odoo_id already exists in $table\n";
+        echo "  ✓ erp_id already exists in $table\n";
     }
 }
 
@@ -171,14 +189,14 @@ echo "\nStep 2: Syncing field metadata...\n";
 // 2. إضافة metadata للحقول
 foreach ($tables as $table) {
     // التحقق من وجود الحقل في acl_field
-    $existing = @jitquery("SELECT * FROM `acl_field` WHERE `acl_table`='$table' AND `acl_field`='erp_odoo_id'", -1);
+    $existing = @jitquery("SELECT * FROM `acl_field` WHERE `acl_table`='$table' AND `acl_field`='erp_id'", -1);
     
     if (empty($existing)) {
-        echo "  → Adding metadata for $table.erp_odoo_id...";
+        echo "  → Adding metadata for $table.erp_id...";
         
         $field_data = [
             'acl_table' => $table,
-            'acl_field' => 'erp_odoo_id',
+            'acl_field' => 'erp_id',
             'acl_field_label' => 'Odoo ID',
             'acl_field_label_ar' => 'معرف أودو',
             'acl_field_type' => 'int',
@@ -199,7 +217,7 @@ foreach ($tables as $table) {
             echo " ⚠️ Warning: " . ($insert_result['error'] ?? 'Unknown error') . "\n";
         }
     } else {
-        echo "  ✓ Metadata already exists for $table.erp_odoo_id\n";
+        echo "  ✓ Metadata already exists for $table.erp_id\n";
     }
 }
 
@@ -232,8 +250,10 @@ http://your-domain.com/setup_odoo.php
 ```
 your-project/
 ├── functions_lib/
-│   ├── odoo.php          ← الملف الرئيسي (استخدم هذا)
-│   └── acc.php           ← يحتوي على einv_return
+│   ├── odoo.php          ← الملف الرئيسي (تكامل Odoo)
+│   ├── erp.php           ← دوال ERP الموحدة (erp_log, erp_save_log)
+│   ├── acc.php           ← يحتوي على einv_return
+│   └── lib/erp/          ← مكتبة ERP (Factory, Interface)
 ├── functions_libX/
 │   ├── odoo.php          ← نسخة احتياطية
 │   └── acc.php           ← نسخة احتياطية
@@ -291,7 +311,7 @@ if ($result['status'] == 'OK') {
  * 
  * @param int $einv_id - معرف الفاتورة
  * @param string $table - اسم الجدول (plt_einv أو scm_einv)
- * @param int $auth_id - معرف المستخدم (اختياري)
+ * @param string $table_line - جدول سطور الفاتورة (plt_einv_line أو scm_einv_line)
  * @return array - النتيجة
  */
 $result = odoo_post(1062, 'plt_einv');
@@ -324,7 +344,8 @@ if ($result['status'] == 'OK') {
 ### 3️⃣ مزامنة العقار - `odoo_sync_property()`
 
 ```php
-$result = odoo_sync_property($property_id);
+// المعامل: are_id (معرف العقار في plt_prop)
+$result = odoo_sync_property($are_id);
 ```
 
 ---
@@ -332,7 +353,8 @@ $result = odoo_sync_property($property_id);
 ### 4️⃣ مزامنة الوحدة - `odoo_sync_unit()`
 
 ```php
-$result = odoo_sync_unit($unit_id);
+// المعامل: are_id (معرف الوحدة في plt_are أو plt_prop)
+$result = odoo_sync_unit($are_id);
 ```
 
 ---
@@ -340,7 +362,8 @@ $result = odoo_sync_unit($unit_id);
 ### 5️⃣ مزامنة العقد - `odoo_sync_contract()`
 
 ```php
-$result = odoo_sync_contract($tmt_id);
+// المعامل: tts_id (معرف العقد في plt_tts)
+$result = odoo_sync_contract($tts_id);
 ```
 
 ---
@@ -348,7 +371,17 @@ $result = odoo_sync_contract($tmt_id);
 ### 6️⃣ مزامنة القسط - `odoo_sync_installment()`
 
 ```php
-$result = odoo_sync_installment($installment_id);
+// المعامل: tmt_id (معرف القسط/المستحق في plt_tmt)
+$result = odoo_sync_installment($tmt_id);
+```
+
+---
+
+### 7️⃣ تأكيد وإرسال الفاتورة - `odoo_confirm()`
+
+```php
+// بديل لـ odoo_post - يستدعيه تلقائياً
+$result = odoo_confirm($einv_id, 'plt_einv', 'plt_einv_line');
 ```
 
 ---
@@ -363,10 +396,10 @@ $einv_id = 1062;
 $result = odoo_post($einv_id, 'plt_einv');
 
 // النظام سيفعل:
-// 1. يتحقق من وجود erp_odoo_id للعميل
+// 1. يتحقق من وجود erp_id للعميل
 // 2. إذا لم يكن موجود، يسينك العميل أولاً
 // 3. يرسل الفاتورة
-// 4. يحفظ erp_odoo_id للفاتورة
+// 4. يحفظ erp_id للفاتورة
 // 5. يحدث الحالة إلى 55630 (plt_einv) أو 55640 (scm_einv)
 ```
 
@@ -389,7 +422,7 @@ $result = odoo_post($einv_id, 'plt_einv');
 // 3. يسينك العميل الجديد مع Odoo
 // 4. يربط الفاتورة بالعميل الجديد
 // 5. يرسل الفاتورة
-// 6. يحفظ erp_odoo_id
+// 6. يحفظ erp_id
 ```
 
 **⚠️ ملاحظة:** الفاتورة يجب أن تحتوي على `customer_ar` (اسم العميل) على الأقل، وإلا ستفشل العملية.
@@ -405,7 +438,7 @@ $return_data = einv_return($original_einv_id, 'plt_einv');
 
 // النظام سيفعل:
 // 1. ينسخ بيانات الفاتورة الأصلية
-// 2. لا ينسخ erp_odoo_id (يبقى NULL)
+// 2. لا ينسخ erp_id (يبقى NULL)
 // 3. عند إرسال فاتورة المرتجع لـ Odoo، سيأخذ معرف جديد
 ```
 
@@ -437,7 +470,7 @@ if ($response['status'] == 'OK' && !empty($odoo_invoice_id)) {
     @jitquery("
         UPDATE `$table`
         SET
-            `erp_odoo_id` = '$odoo_invoice_id',
+            `erp_id` = '$odoo_invoice_id',
             `acl_status_code` = '$acl_status_code',
             `dt_updated` = UNIX_TIMESTAMP()
         WHERE `einv_id` = '$einv_id'
@@ -451,7 +484,7 @@ if ($response['status'] == 'OK' && !empty($odoo_invoice_id)) {
 
 ### المشكلة 1: "No Fields Found in Update Function"
 
-**السبب:** الحقل `erp_odoo_id` غير موجود في قاعدة البيانات أو في `acl_field`.
+**السبب:** الحقل `erp_id` غير موجود في قاعدة البيانات أو في `acl_field`.
 
 **الحل:**
 ```bash
@@ -532,11 +565,11 @@ if (!in_array($cal_type, ['cal_gr', 'cal_hj'])) {
 
 ---
 
-### المشكلة 6: فاتورة المرتجع تأخذ نفس `erp_odoo_id`
+### المشكلة 6: فاتورة المرتجع تأخذ نفس `erp_id`
 
 **السبب:** كان الحقل يُنسخ في `einv_return()`.
 
-**الحل:** تم إضافة `erp_odoo_id` لقائمة `$reset` في جميع ملفات `einv_return`:
+**الحل:** تم إضافة `erp_id` لقائمة `$reset` في جميع ملفات `einv_return`:
 ```php
 $reset = [
     'einv_id',
@@ -547,7 +580,7 @@ $reset = [
     'dt_created',
     'dt_updated',
     'zatca_pdf_link',
-    'erp_odoo_id',      // ← جديد
+    'erp_id',      // ← جديد
     'odoo_invoice_id'   // ← جديد
 ];
 ```
@@ -558,20 +591,21 @@ $reset = [
 
 ### 1. `functions_lib/odoo.php`
 **التعديلات:**
-- ✅ إضافة فحص `erp_odoo_id` في `odoo_post()`
+- ✅ إضافة فحص `erp_id` في `odoo_post()`
 - ✅ مزامنة العميل تلقائياً إذا لم يكن موجود
 - ✅ إنشاء عميل جديد تلقائياً إذا كان `customer_id = 0`
-- ✅ حفظ `erp_odoo_id` للعميل والفاتورة
+- ✅ حفظ `erp_id` للعميل والفاتورة
 - ✅ تحديث `acl_status_code` إلى `55630` (plt_einv) أو `55640` (scm_einv)
 - ✅ معالجة صيغ مختلفة من استجابات Odoo API
 - ✅ Validation تلقائي لـ `entity_type`, `entity_idtype`, `cal_type`
+- ✅ استخدام `erp_log()` بدلاً من `error_log` (للمراسلات المهمة فقط)
 
 ### 2. `functions_libX/odoo.php`
 نفس التعديلات في الملف الاحتياطي.
 
 ### 3. `functions_lib/acc.php`
 **التعديلات:**
-- ✅ إضافة `erp_odoo_id` و `odoo_invoice_id` لقائمة `$reset` في `einv_return()`
+- ✅ إضافة `erp_id` و `odoo_invoice_id` لقائمة `$reset` في `einv_return()`
 
 ### 4. `functions_libX/acc.php`
 نفس التعديلات في الملف الاحتياطي.
@@ -580,34 +614,35 @@ $reset = [
 
 ## 📝 سجلات النظام (Logs)
 
+### نظام التسجيل
+يستخدم التكامل دالة **`erp_log()`** للتسجيل (من `functions_lib/erp.php`)، و**`erp_save_log()`** لحفظ السجلات في جدول `erp_integ_log`.
+
 ### كيف تفحص السجلات؟
 
 ```bash
-# في Linux/Mac
+# السجلات تظهر في error_log (erp_log يستخدم error_log)
+# Linux/Mac
 tail -f /path/to/error_log
 
-# في Windows (Laragon)
+# Windows (Laragon)
 tail -f C:\laragon\www\logs\error.log
 ```
 
-### نموذج لسجل ناجح:
+### استعلام سجلات قاعدة البيانات
+
+```sql
+-- آخر عمليات التكامل
+SELECT * FROM erp_integ_log 
+WHERE provider = 'odoo' 
+ORDER BY dt_created DESC LIMIT 50;
+```
+
+### نموذج لسجل ناجح (erp_log):
 
 ```log
-[20-Jan-2026 16:15:00] ODOO_POST: Invoice 1070 has no valid client (customer_id=0), attempting to create client...
-[20-Jan-2026 16:15:00] ODOO_POST: Attempting to create client - Name: مالك 101, VAT: 
-[20-Jan-2026 16:15:00] ODOO_POST: Created new client with ID: 164
-[20-Jan-2026 16:15:01] ODOO_SYNC_CLIENT: Client 164 - Mapped entity_type='individual', entity_idtype='nid', cal_type='cal_gr'
-[20-Jan-2026 16:15:02] ODOO_SYNC_CLIENT Response: {"result":{"status":"created","partner_id":69}}
-[20-Jan-2026 16:15:02] ODOO_SYNC_CLIENT: About to save erp_odoo_id 69 for client 164
-[20-Jan-2026 16:15:02] ODOO_SYNC_CLIENT: Verified erp_odoo_id in DB: 69
-[20-Jan-2026 16:15:02] ODOO_POST: New client synced successfully - client_id: 164, erp_odoo_id: 69
-[20-Jan-2026 16:15:02] ODOO_POST URL: http://88.223.92.71:3050/api/simat/invoices/create
-[20-Jan-2026 16:15:03] ODOO_POST: Full payload: {"invoice_id":"1070","customer_id":"164",...}
-[20-Jan-2026 16:15:03] ODOO_POST Response: {"result":{"status":"success","odoo_id":43}}
-[20-Jan-2026 16:15:03] ODOO_POST: Parsed odoo_invoice_id = 43
-[20-Jan-2026 16:15:03] ODOO_POST: About to save erp_odoo_id 43 for invoice 1070
-[20-Jan-2026 16:15:03] ODOO_POST: Update result: {"status":"OK","affected":1}
-[20-Jan-2026 16:15:03] ODOO_POST: Verified erp_odoo_id in DB: 43
+ERP[ODOO]: SYNC [client #164] create → success (odoo_id=69)
+ERP[ODOO]: Client #164 synced (erp_id=69)
+ERP[ODOO]: Invoice #1070 synced (erp_id=43)
 ```
 
 ---
@@ -622,9 +657,9 @@ $client_id = 80;
 $result = odoo_sync_client($client_id);
 print_r($result);
 
-// تحقق من erp_odoo_id في قاعدة البيانات
+// تحقق من erp_id في قاعدة البيانات
 $client = jitquery_array(NULL, "`res_client` WHERE `client_id`='$client_id'", -1);
-echo "Odoo ID: " . $client['erp_odoo_id'];
+echo "Odoo ID: " . $client['erp_id'];
 ```
 
 ### 2. اختبار إرسال فاتورة:
@@ -635,9 +670,9 @@ $einv_id = 1062;
 $result = odoo_post($einv_id, 'plt_einv');
 print_r($result);
 
-// تحقق من erp_odoo_id في قاعدة البيانات
+// تحقق من erp_id في قاعدة البيانات
 $invoice = jitquery_array(NULL, "`plt_einv` WHERE `einv_id`='$einv_id'", -1);
-echo "Odoo Invoice ID: " . $invoice['erp_odoo_id'];
+echo "Odoo Invoice ID: " . $invoice['erp_id'];
 echo "Status Code: " . $invoice['acl_status_code']; // يجب أن يكون 55630
 ```
 
@@ -659,15 +694,15 @@ print_r($result);
 
 ### ✅ افعل:
 - ✔️ تأكد من تشغيل `setup_odoo.php` مرة واحدة فقط
-- ✔️ تابع سجلات الأخطاء (error logs) لاستكشاف المشاكل
+- ✔️ تابع سجلات التكامل (`erp_integ_log` و `erp_log` في error_log)
 - ✔️ اختبر على بيانات تجريبية أولاً
 - ✔️ احفظ نسخة احتياطية من قاعدة البيانات قبل التعديلات
 
 ### ❌ لا تفعل:
-- ✘ لا تعدل قيم `erp_odoo_id` يدوياً في قاعدة البيانات
-- ✘ لا تحذف الحقل `erp_odoo_id` بعد الإعداد
+- ✘ لا تعدل قيم `erp_id` يدوياً في قاعدة البيانات
+- ✘ لا تحذف الحقل `erp_id` بعد الإعداد
 - ✘ لا تستخدم أكواد الحالة القديمة (`44140`, `53840`)
-- ✘ لا تنسخ `erp_odoo_id` بين السجلات
+- ✘ لا تنسخ `erp_id` بين السجلات
 
 ---
 
@@ -683,15 +718,15 @@ print_r($result);
 2. **تحقق من قاعدة البيانات:**
    ```sql
    -- تحقق من وجود الحقل
-   SHOW COLUMNS FROM res_client LIKE 'erp_odoo_id';
+   SHOW COLUMNS FROM res_client LIKE 'erp_id';
    
    -- تحقق من البيانات
-   SELECT client_id, entity_name, erp_odoo_id FROM res_client WHERE client_id = 80;
+   SELECT client_id, entity_name, erp_id FROM res_client WHERE client_id = 80;
    ```
 
 3. **اختبر الاتصال بـ Odoo:**
    ```php
-   $result = odoo_request('api/test_connection', 'GET', []);
+   $result = odoo_test();  // أو odoo_request('api/simat/cost-centers/list', 'GET', []);
    print_r($result);
    ```
 
@@ -713,4 +748,25 @@ print_r($result);
 **تم بحمد الله! 🚀**
 
 > إذا كانت لديك أي أسئلة أو مشاكل، راجع قسم [استكشاف الأخطاء](#استكشاف-الأخطاء) أو افحص سجلات النظام.
+
+---
+
+## 📎 ملاحظات إضافية
+
+### التوافق مع نظام Multi-ERP
+يمكنك استخدام الدوال الموحدة من `erp.php` بدلاً من استدعاء Odoo مباشرة:
+```php
+erp_sync_client($client_id);      // بديل لـ odoo_sync_client
+erp_post_invoice($einv_id, 'plt_einv');  // بديل لـ odoo_post
+```
+
+### إعداد الاتصال بـ Odoo
+يتم جلب إعدادات الاتصال من جدول `mw_odoo_auth` أو `odoo_auth` (الحقول: `base_url`/`auth_host`, `token`, `api_key`).
+
+
+
+
+
+
+
 
