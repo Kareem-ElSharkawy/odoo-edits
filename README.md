@@ -136,8 +136,68 @@ SELECT 'Setup completed successfully!' AS Status;
 
 **⚠️ ملاحظة:** إذا كانت بعض الجداول لا تحتوي على الأعمدة المذكورة بعد `AFTER`، قم بحذف جزء `AFTER` من الأمر.
 
-#### جدول سجلات التكامل (اختياري - للمتابعة)
-إذا أردت حفظ سجلات عمليات التكامل في قاعدة البيانات، شغّل `functions_lib/erp_integ_log.sql` أو `setup_erp_system.sql`.
+#### جدول سجلات التكامل `erp_integ_log`
+
+شغّل الـ SQL التالي لإنشاء جدول السجلات:
+
+```sql
+-- جدول سجلات التكامل مع ERP
+CREATE TABLE IF NOT EXISTS `erp_integ_log` (
+  `log_id` int(11) NOT NULL AUTO_INCREMENT,
+  `entity_type` varchar(50) NOT NULL COMMENT 'invoice, client, property, contract, etc.',
+  `entity_id` int(11) NOT NULL COMMENT 'einv_id, client_id, are_id, tts_id, etc.',
+  `operation` varchar(50) NOT NULL COMMENT 'post, sync, create, update, delete',
+  `status` varchar(20) NOT NULL COMMENT 'success, error, pending',
+  `provider` varchar(20) NOT NULL DEFAULT 'odoo' COMMENT 'odoo, sap, dynamics',
+  `http_code` int(11) DEFAULT 0,
+  `error_message` text DEFAULT NULL,
+  `request_data` longtext DEFAULT NULL COMMENT 'JSON encoded request data',
+  `response_data` longtext DEFAULT NULL COMMENT 'JSON encoded response data',
+  `dt_created` int(11) NOT NULL,
+  PRIMARY KEY (`log_id`),
+  KEY `entity_type_id` (`entity_type`, `entity_id`),
+  KEY `provider` (`provider`),
+  KEY `status` (`status`),
+  KEY `dt_created` (`dt_created`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+```
+
+#### مفاتيح اللغة `erp_lang_keys`
+
+شغّل الـ SQL التالي لإضافة مفاتيح اللغة (يتطلب جدول `lang` بهيكل: `lang_code`, `lang_ar`, `lang_en`):
+
+```sql
+-- مفاتيح اللغة لـ Odoo و ERP
+INSERT INTO `lang` (`lang_code`, `lang_ar`, `lang_en`) VALUES
+('odoo', 'أودو', 'Odoo'),
+('odoo_no_auth', 'مصادقة Odoo غير موجودة', 'Odoo authentication not found'),
+('odoo_connected', 'تم الاتصال بنجاح', 'Connected successfully'),
+('odoo_connected_error', 'خطأ في الاتصال', 'Connection error'),
+('odoo_client_synced', 'تم مزامنة العميل بنجاح', 'Client synced successfully'),
+('odoo_property_synced', 'تم مزامنة العقار بنجاح', 'Property synced successfully'),
+('odoo_unit_synced', 'تم مزامنة الوحدة بنجاح', 'Unit synced successfully'),
+('odoo_contract_synced', 'تم مزامنة العقد بنجاح', 'Contract synced successfully'),
+('odoo_installment_synced', 'تم مزامنة القسط بنجاح', 'Installment synced successfully'),
+('odoo_invoice_synced', 'تم مزامنة الفاتورة بنجاح', 'Invoice synced successfully'),
+('odoo_already_synced', 'تم المزامنة مسبقاً إلى Odoo', 'Invoice already synced to Odoo'),
+('odoo_cost_centers_fetched', 'تم جلب مراكز التكلفة بنجاح', 'Cost centers fetched successfully'),
+('invoice_not_found', 'الفاتورة غير موجودة', 'Invoice not found'),
+('verification_unknown', 'فشل التحقق', 'Verification failed')
+ON DUPLICATE KEY UPDATE 
+  `lang_ar` = VALUES(`lang_ar`),
+  `lang_en` = VALUES(`lang_en`);
+```
+
+**بديل مبسط لحقول erp_id** (إذا لم تستخدم setup_odoo.php):
+```sql
+ALTER TABLE `res_client` ADD COLUMN `erp_id` INT(11) NULL;
+ALTER TABLE `plt_einv` ADD COLUMN `erp_id` INT(11) NULL;
+ALTER TABLE `scm_einv` ADD COLUMN `erp_id` INT(11) NULL;
+ALTER TABLE `plt_prop` ADD COLUMN `erp_id` INT(11) NULL;
+ALTER TABLE `plt_are` ADD COLUMN `erp_id` INT(11) NULL;
+ALTER TABLE `plt_tts` ADD COLUMN `erp_id` INT(11) NULL;
+ALTER TABLE `plt_tmt` ADD COLUMN `erp_id` INT(11) NULL;
+```
 
 ---
 
@@ -617,11 +677,27 @@ $reset = [
 نفس التعديلات في الملف الاحتياطي.
 
 ### 3. `functions_lib/acc.php`
-**التعديلات:**
-- ✅ إضافة `erp_id` و `odoo_invoice_id` لقائمة `$reset` في `einv_return()`
+
+**الوظيفة المعدّلة:** `einv_return($einv_id, $table, $table_line)`
+
+**الغرض:** إنشاء فاتورة مرتجع (Credit Note) من فاتورة أصلية.
+
+**التعديل المطلوب:** إضافة `erp_id` و `odoo_invoice_id` إلى مصفوفة `$reset` حتى لا تُنسخ قيمتهما من الفاتورة الأصلية إلى فاتورة المرتجع. فاتورة المرتجع يجب أن تحصل على معرف جديد في Odoo.
+
+**قبل التعديل:**
+```php
+$reset = ['einv_id','einv_date','uuid','create_by','update_by','dt_created','dt_updated','zatca_pdf_link'];
+```
+
+**بعد التعديل:**
+```php
+$reset = ['einv_id','einv_date','uuid','create_by','update_by','dt_created','dt_updated','zatca_pdf_link','erp_id','odoo_invoice_id'];
+```
+
+**الموقع في الملف:** السطر 35 تقريباً، داخل دالة `einv_return()`.
 
 ### 4. `functions_libX/acc.php`
-نفس التعديلات في الملف الاحتياطي.
+نفس التعديل في دالة `einv_return()`.
 
 ---
 
