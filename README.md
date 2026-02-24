@@ -288,6 +288,11 @@ $result = erp_post_invoice(1062, 'plt_einv');
 
 **acc.php (و libX):** في `einv_return()` أضف `erp_id` إلى `$reset` حتى لا يُنسخ للمرتجع.
 
+```php
+$reset=['einv_id','einv_date','uuid','create_by','update_by','dt_created','dt_updated','zatca_pdf_link','erp_id'];
+// 		if($einv['acl_status_code']!=44120)
+```
+
 ### 5. plt_einv.php
 
 **التعديلات:**
