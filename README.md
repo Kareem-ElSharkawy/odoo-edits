@@ -64,6 +64,7 @@ $odoo_api_key = 'your_api_key';
 
 ### 3. الجداول المطلوبة
 يجب أن تكون الجداول التالية موجودة:
+- **`erp_integrations`** — إعدادات الاتصال بـ ERP (Odoo/SAP)؛ يُنشأ من الـ SQL في الدليل.
 - `res_client` - العملاء
 - `plt_einv` - الفواتير الإلكترونية (إيجارات)
 - `scm_einv` - الفواتير الإلكترونية (صيانة/مبيعات)
@@ -72,7 +73,7 @@ $odoo_api_key = 'your_api_key';
 - `plt_tts` - العقود
 - `plt_tmt` - الأقساط/المستحقات
 
-**ملاحظة:** إذا كان مشروعك يستخدم `acc_property` أو `acc_unit`، أضف `erp_id` لتلك الجداول. الكود يستخدم `plt_prop` و `plt_are` لمزامنة العقارات والوحدات.
+**ملاحظة:** إذا لم يوجد جدول `mw_odoo_auth` أو `odoo_auth`، يتم الاعتماد على `erp_integrations` (السجل الذي `provider = 'odoo'` و `active = 1`).
 
 ---
 
@@ -135,6 +136,64 @@ SELECT 'Setup completed successfully!' AS Status;
 ```
 
 **⚠️ ملاحظة:** إذا كانت بعض الجداول لا تحتوي على الأعمدة المذكورة بعد `AFTER`، قم بحذف جزء `AFTER` من الأمر.
+
+#### جدول إعدادات التكامل `erp_integrations`
+
+جدول **إلزامي** لحفظ إعدادات الاتصال بأنظمة ERP (Odoo، SAP، Dynamics). نظام Multi-ERP و `odoo_check()` يقرؤون منه عند عدم وجود `mw_odoo_auth` أو `odoo_auth`.
+
+**الاستخدام في الكود:**
+- `ERP_Factory.php`: اختيار النظام النشط (`active = 1`)، تحميل الإعدادات.
+- `odoo.php`: عند غياب `odoo_auth` يتم استخدام السجل من `erp_integrations` حيث `provider = 'odoo'`.
+
+**إنشاء الجدول:**
+
+```sql
+CREATE TABLE `erp_integrations` (
+  `erp_integration_id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT,
+  `erp_integration_title` varchar(60) NOT NULL COMMENT 'عنوان الربط',
+  `provider` varchar(30) DEFAULT NULL COMMENT 'odoo, sap, dynamics',
+  `erp_integration_code` varchar(60) NOT NULL COMMENT 'كود فريد: odoo, sap, ...',
+  `erp_api_url` varchar(255) DEFAULT NULL COMMENT 'رابط API',
+  `company_name` varchar(255) DEFAULT NULL,
+  `erp_username` varchar(255) DEFAULT NULL,
+  `erp_password` varchar(255) DEFAULT NULL,
+  `api_secret` varchar(255) DEFAULT NULL COMMENT 'لـ Odoo: Token أو API Key',
+  `active` tinyint(1) UNSIGNED NOT NULL DEFAULT 1 COMMENT '1 = النظام النشط',
+  `created_by` int(10) UNSIGNED DEFAULT 0,
+  `updated_by` int(10) UNSIGNED DEFAULT 0,
+  `dt_created` int(10) UNSIGNED DEFAULT 0,
+  `dt_updated` int(10) UNSIGNED DEFAULT 0,
+  `dt_last_sync` int(10) UNSIGNED DEFAULT NULL,
+  PRIMARY KEY (`erp_integration_id`),
+  KEY `idx_code` (`erp_integration_code`),
+  KEY `idx_active` (`active`),
+  KEY `idx_erp_api_url` (`erp_api_url`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+```
+
+**إدراج سجل Odoo (مثال — غيّر القيم حسب بيئتك):**
+
+```sql
+INSERT INTO `erp_integrations` (
+  `erp_integration_title`, `provider`, `erp_integration_code`,
+  `erp_api_url`, `api_secret`, `active`, `dt_created`, `dt_updated`
+) VALUES (
+  'ربط أودوو', 'odoo', 'odoo',
+  'http://YOUR_ODOO_HOST:PORT', 'YOUR_API_SECRET_OR_TOKEN',
+  1, UNIX_TIMESTAMP(), UNIX_TIMESTAMP()
+);
+```
+
+**توضيح الحقول لـ Odoo:**
+
+| الحقل | الاستخدام |
+|-------|-----------|
+| `provider` | `odoo` — يحدد أن السجل لـ Odoo |
+| `erp_api_url` | عنوان قاعدة Odoo (مثل `http://88.223.92.71:3050`) |
+| `api_secret` | Token أو API Key للمصادقة (يُرسل كـ Bearer و X-API-Key) |
+| `active` | `1` = هذا الربط هو النشط؛ يُفضّل أن يكون ربط Odoo واحد فقط نشط |
+
+---
 
 #### جدول سجلات التكامل `erp_integ_log`
 
