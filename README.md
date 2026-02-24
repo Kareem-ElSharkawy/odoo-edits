@@ -235,6 +235,9 @@ $result = odoo_sync_client(80);
 $result = erp_post_invoice(1062, 'plt_einv');
 // ['status'=>'OK', 'erp_id'=>31, 'odoo_id'=>31, 'invoice_number'=>'...']
 ```
+**When adding a new action to confirm/send invoice to ERP, use the function `erp_post_invoice`.**  
+عند إضافة action جديد لتأكيد أو إرسال الفاتورة إلى ERP استخدم الدالة `erp_post_invoice`.
+
 `odoo_post($einv_id, $table)` لا يزال يعمل (توافق قديم).
 
 ### باقي الدوال
