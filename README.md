@@ -193,12 +193,30 @@ ALTER TABLE `plt_tmt` ADD COLUMN `erp_id` INT(11) NULL;
 
 ---
 
-### 2. الملفات المطلوبة
+### الخطوة 2: التحقق من الملفات المطلوبة
 
-- `functions_lib/`: `odoo.php`, `erp.php`, `ERP_Odoo.php`, `acc.php`, `lib/erp/`
-- `functions_libX/`: `odoo.php`, `acc.php`
-- `plt_einv.php`
-- اختياري: `setup_erp_system.sql`, `admin_erp_settings.php`
+تأكد من وجود الملفات التالية:
+
+```
+your-project/
+├── functions_lib/
+│   ├── odoo.php              ← الملف الرئيسي (تكامل Odoo)
+│   ├── erp.php               ← دوال ERP الموحدة (erp_log, erp_save_log)
+│   ├── ERP_Odoo.php          ← كلاس Odoo لنظام Multi-ERP
+│   ├── acc.php               ← يحتوي على einv_return
+│   ├── erp_integ_log.sql     ← جدول سجلات التكامل
+│   ├── erp_lang_keys.sql     ← مفاتيح اللغة للرسائل
+│   └── lib/erp/              ← مكتبة ERP (Factory, Interface, Functions)
+├── functions_libX/
+│   ├── odoo.php              ← نسخة احتياطية
+│   └── acc.php               ← نسخة احتياطية
+├── plt_einv.php              ← صفحة الفواتير + إجراء erp_post_invoice
+├── setup_erp_system.sql      ← إعداد sys_config و erp_integ_log (لـ Multi-ERP)
+├── admin_erp_settings.php    ← لوحة إعدادات ERP (اختياري)
+└── functions/
+    ├── connect.php           ← اتصال قاعدة البيانات
+    └── functions.php        ← الوظائف الأساسية
+```
 
 SQL للتنفيذ مرة واحدة: محتوى `erp_integ_log`, `erp_lang_keys`, و SQL حقول `erp_id` (موجود أعلاه في الدليل).
 
@@ -270,14 +288,22 @@ $result = erp_post_invoice(1062, 'plt_einv');
 
 **acc.php (و libX):** في `einv_return()` أضف `erp_id` إلى `$reset` حتى لا يُنسخ للمرتجع.
 
-**plt_einv.php:** عند `$do == 'erp_post_invoice'` استدعاء `erp_post_invoice($id, 'plt_einv')` بعد تحميل `functions_lib/lib/erp.php`. الإبقاء على `odoo_test` للاختبار.
+### 5. plt_einv.php
 
+**التعديلات:**
+- إضافة action **`erp_post_invoice`** في بداية الصفحة: عند `$do == 'erp_post_invoice'` يتم استدعاء `erp_post_invoice($id, 'plt_einv')` بعد تحميل `functions_lib/lib/erp.php`.
+- توحيد actions القديمة: عند `$do == 'odoo_sync_invoice'` أو `odoo_confirm` أو `odoo_post` يتم التوجيه إلى `erp_post_invoice($id, 'plt_einv')` بدلاً من استدعاء Odoo مباشرة.
+- الإبقاء على `$do == 'odoo_test'` لاختبار الاتصال.
+
+**مقتطف الكود:**
 ```php
+// ERP POST INVOICE - Handle FIRST
 if($do == 'erp_post_invoice') {
     require_once('functions_lib/lib/erp.php');
     if (function_exists('erp_post_invoice')) {
         $json_callback = erp_post_invoice($id, 'plt_einv');
     }
+    // ...
 }
 ```
 
