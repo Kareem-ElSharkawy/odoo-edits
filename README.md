@@ -83,7 +83,7 @@ $odoo_api_key = 'your_api_key';
 
 قم بتشغيل السكريبت التالي **مرة واحدة فقط**:
 
-#### 📄 ملف: `setup_odoo.sql`
+#### إضافة حقول `erp_id` (SQL)
 
 ```sql
 -- ===================================================================
@@ -247,7 +247,7 @@ ON DUPLICATE KEY UPDATE
   `lang_en` = VALUES(`lang_en`);
 ```
 
-**بديل مبسط لحقول erp_id** (إذا لم تستخدم setup_odoo.php):
+**بديل مبسط لحقول erp_id** (جداول plt_*):
 ```sql
 ALTER TABLE `res_client` ADD COLUMN `erp_id` INT(11) NULL;
 ALTER TABLE `plt_einv` ADD COLUMN `erp_id` INT(11) NULL;
@@ -260,109 +260,7 @@ ALTER TABLE `plt_tmt` ADD COLUMN `erp_id` INT(11) NULL;
 
 ---
 
-### الخطوة 2️⃣: تحديث metadata للحقول
-
-قم بتشغيل السكريبت PHP التالي **مرة واحدة فقط**:
-
-#### 📄 ملف: `setup_odoo.php`
-
-```php
-<?php
-/**
- * Setup Odoo Integration - Add erp_id field metadata
- * تشغيل مرة واحدة فقط لإضافة بيانات الحقل erp_id
- */
-
-require_once 'functions/connect.php';
-require_once 'functions/functions.php';
-
-// قائمة الجداول والحقول
-$tables = [
-    'res_client',
-    'plt_einv',
-    'scm_einv',
-    'acc_property',
-    'acc_unit',
-    'plt_tmt',
-    'plt_installments'
-];
-
-echo "🚀 Starting Odoo Integration Setup...\n\n";
-
-// 1. إضافة الحقول
-echo "Step 1: Adding erp_id columns...\n";
-foreach ($tables as $table) {
-    $check = @jitquery("SHOW COLUMNS FROM `$table` LIKE 'erp_id'", -1);
-    
-    if (empty($check)) {
-        echo "  → Adding erp_id to $table...";
-        $result = @jitquery("ALTER TABLE `$table` ADD COLUMN `erp_id` INT(11) NULL DEFAULT NULL COMMENT 'Odoo ID'", -1);
-        echo " ✅\n";
-    } else {
-        echo "  ✓ erp_id already exists in $table\n";
-    }
-}
-
-echo "\nStep 2: Syncing field metadata...\n";
-
-// 2. إضافة metadata للحقول
-foreach ($tables as $table) {
-    // التحقق من وجود الحقل في acl_field
-    $existing = @jitquery("SELECT * FROM `acl_field` WHERE `acl_table`='$table' AND `acl_field`='erp_id'", -1);
-    
-    if (empty($existing)) {
-        echo "  → Adding metadata for $table.erp_id...";
-        
-        $field_data = [
-            'acl_table' => $table,
-            'acl_field' => 'erp_id',
-            'acl_field_label' => 'Odoo ID',
-            'acl_field_label_ar' => 'معرف أودو',
-            'acl_field_type' => 'int',
-            'acl_field_length' => 11,
-            'acl_field_default' => NULL,
-            'acl_field_null' => 1,
-            'acl_field_index' => 0,
-            'acl_field_auto_increment' => 0,
-            'acl_field_comment' => 'Odoo ERP ID',
-            'acl_status_code' => '10110'
-        ];
-        
-        $insert_result = @insert('acl_field', $field_data);
-        
-        if ($insert_result['status'] == 'OK') {
-            echo " ✅\n";
-        } else {
-            echo " ⚠️ Warning: " . ($insert_result['error'] ?? 'Unknown error') . "\n";
-        }
-    } else {
-        echo "  ✓ Metadata already exists for $table.erp_id\n";
-    }
-}
-
-echo "\n✅ Setup completed successfully!\n";
-echo "\nNext steps:\n";
-echo "1. Test client sync: odoo_sync_client(CLIENT_ID)\n";
-echo "2. Test invoice post: erp_post_invoice(EINV_ID, TABLE_NAME)\n";
-echo "\n";
-?>
-```
-
-**لتشغيل السكريبت:**
-```bash
-php setup_odoo.php
-```
-
-أو قم بفتحه في المتصفح:
-```
-http://your-domain.com/setup_odoo.php
-```
-
-**⚠️ مهم:** احذف الملف بعد التشغيل الناجح لأسباب أمنية!
-
----
-
-### الخطوة 3️⃣: التحقق من الملفات المطلوبة
+### الخطوة 2️⃣: التحقق من الملفات المطلوبة
 
 تأكد من وجود الملفات التالية:
 
@@ -379,7 +277,6 @@ your-project/
 ├── functions_libX/
 │   ├── odoo.php              ← نسخة احتياطية
 │   └── acc.php               ← نسخة احتياطية
-├── setup_odoo.php            ← إعداد حقول erp_id و metadata
 ├── setup_erp_system.sql      ← إعداد sys_config و erp_integ_log (لـ Multi-ERP)
 ├── admin_erp_settings.php    ← لوحة إعدادات ERP (اختياري)
 └── functions/
@@ -625,11 +522,7 @@ if ($response['status'] == 'OK' && !empty($odoo_invoice_id)) {
 
 **السبب:** الحقل `erp_id` غير موجود في قاعدة البيانات أو في `acl_field`.
 
-**الحل:**
-```bash
-# شغل السكريبتات مرة أخرى
-php setup_odoo.php
-```
+**الحل:** تأكد من تنفيذ SQL إضافة حقل `erp_id` للجداول وإضافة السجل في `acl_field` إن لزم.
 
 ---
 
@@ -764,6 +657,31 @@ $reset = ['einv_id','einv_date','uuid','create_by','update_by','dt_created','dt_
 ### 4. `functions_libX/acc.php`
 نفس التعديل في دالة `einv_return()`.
 
+### 5. `plt_einv.php`
+
+**التعديلات:**
+- ✅ إضافة action **`erp_post_invoice`** في بداية الصفحة: عند `$do == 'erp_post_invoice'` يتم استدعاء `erp_post_invoice($id, 'plt_einv')` بعد تحميل `functions_lib/lib/erp.php`.
+- ✅ توحيد actions القديمة: عند `$do == 'odoo_sync_invoice'` أو `odoo_confirm` أو `odoo_post` يتم التوجيه إلى `erp_post_invoice($id, 'plt_einv')` بدلاً من استدعاء Odoo مباشرة.
+- ✅ الإبقاء على `$do == 'odoo_test'` لاختبار الاتصال.
+
+**مقتطف الكود:**
+```php
+// ERP POST INVOICE - Handle FIRST
+if($do == 'erp_post_invoice') {
+    require_once('functions_lib/lib/erp.php');
+    if (function_exists('erp_post_invoice')) {
+        $json_callback = erp_post_invoice($id, 'plt_einv');
+    }
+    // ...
+}
+
+// Legacy Odoo actions → redirect to unified ERP handler
+if($do=='odoo_sync_invoice' || $do=='odoo_confirm' || $do=='odoo_post') {
+    require_once('functions_lib/lib/erp.php');
+    $json_callback = erp_post_invoice($id, 'plt_einv');
+}
+```
+
 ---
 
 ## 📝 سجلات النظام (Logs)
@@ -847,7 +765,7 @@ print_r($result);
 ## 🎓 نصائح مهمة
 
 ### ✅ افعل:
-- ✔️ تأكد من تشغيل `setup_odoo.php` مرة واحدة فقط
+- ✔️ نفّذ سكربتات SQL (erp_id، erp_integ_log، erp_integrations) مرة واحدة
 - ✔️ تابع سجلات التكامل (`erp_integ_log` و `erp_log` في error_log)
 - ✔️ اختبر على بيانات تجريبية أولاً
 - ✔️ احفظ نسخة احتياطية من قاعدة البيانات قبل التعديلات
