@@ -343,7 +343,7 @@ foreach ($tables as $table) {
 echo "\n✅ Setup completed successfully!\n";
 echo "\nNext steps:\n";
 echo "1. Test client sync: odoo_sync_client(CLIENT_ID)\n";
-echo "2. Test invoice post: odoo_post(EINV_ID, TABLE_NAME)\n";
+echo "2. Test invoice post: erp_post_invoice(EINV_ID, TABLE_NAME)\n";
 echo "\n";
 ?>
 ```
@@ -434,25 +434,28 @@ if ($result['status'] == 'OK') {
 
 ---
 
-### 2️⃣ إرسال الفواتير - `odoo_post()`
+### 2️⃣ إرسال الفواتير - `erp_post_invoice()`
+
+**الدالة الموصى بها** لإرسال الفاتورة إلى نظام ERP النشط (Odoo أو غيره). تعمل مع أي نظام مفعّل من جدول `erp_integrations`.
 
 ```php
 /**
- * إرسال فاتورة إلى Odoo
- * Post invoice to Odoo
+ * إرسال فاتورة إلى ERP (Odoo عند تفعيله)
+ * Post invoice to ERP
  * 
  * @param int $einv_id - معرف الفاتورة
  * @param string $table - اسم الجدول (plt_einv أو scm_einv)
- * @param string $table_line - جدول سطور الفاتورة (plt_einv_line أو scm_einv_line)
+ * @param int $auth_id - اختياري
  * @return array - النتيجة
  */
-$result = odoo_post(1062, 'plt_einv');
+$result = erp_post_invoice(1062, 'plt_einv');
 
 // النتيجة
 [
     'status' => 'OK',
-    'info' => 'Invoice posted to Odoo successfully',
-    'odoo_id' => 31,  // معرف الفاتورة في Odoo
+    'info' => '...',
+    'erp_id' => 31,        // معرف الفاتورة في ERP
+    'odoo_id' => 31,       // نفس القيمة عند استخدام Odoo
     'invoice_number' => 'INV/2026/0031'
 ]
 ```
@@ -462,14 +465,16 @@ $result = odoo_post(1062, 'plt_einv');
 $einv_id = 1062;
 $table = 'plt_einv';  // أو 'scm_einv'
 
-$result = odoo_post($einv_id, $table);
+$result = erp_post_invoice($einv_id, $table);
 
 if ($result['status'] == 'OK') {
-    echo "تم إرسال الفاتورة! رقم الفاتورة في Odoo: " . $result['invoice_number'];
+    echo "تم إرسال الفاتورة! ERP ID: " . ($result['erp_id'] ?? $result['odoo_id']);
 } else {
     echo "خطأ: " . $result['info'];
 }
 ```
+
+**للتوافق مع الكود القديم:** `odoo_post($einv_id, $table)` لا يزال يعمل ويستدعي نفس المنطق عبر `erp_post_invoice`.
 
 ---
 
@@ -512,8 +517,10 @@ $result = odoo_sync_installment($tmt_id);
 ### 7️⃣ تأكيد وإرسال الفاتورة - `odoo_confirm()`
 
 ```php
-// بديل لـ odoo_post - يستدعيه تلقائياً
+// يستدعي odoo_post/erp_post_invoice داخلياً
 $result = odoo_confirm($einv_id, 'plt_einv', 'plt_einv_line');
+// أو استخدم مباشرة:
+$result = erp_post_invoice($einv_id, 'plt_einv');
 ```
 
 ---
@@ -525,7 +532,7 @@ $result = odoo_confirm($einv_id, 'plt_einv', 'plt_einv_line');
 ```php
 // الفاتورة لها عميل (customer_id موجود)
 $einv_id = 1062;
-$result = odoo_post($einv_id, 'plt_einv');
+$result = erp_post_invoice($einv_id, 'plt_einv');
 
 // النظام سيفعل:
 // 1. يتحقق من وجود erp_id للعميل
@@ -542,7 +549,7 @@ $result = odoo_post($einv_id, 'plt_einv');
 ```php
 // الفاتورة ليس لها عميل
 $einv_id = 1070;
-$result = odoo_post($einv_id, 'plt_einv');
+$result = erp_post_invoice($einv_id, 'plt_einv');
 
 // النظام سيفعل:
 // 1. يكتشف أن customer_id = 0
@@ -593,7 +600,7 @@ $return_data = einv_return($original_einv_id, 'plt_einv');
 ### كيف يتم التحديث تلقائياً؟
 
 ```php
-// في دالة odoo_post():
+// عند نجاح erp_post_invoice / odoo_post:
 if ($response['status'] == 'OK' && !empty($odoo_invoice_id)) {
     // تحديد كود الحالة المناسب
     $acl_status_code = ($table == 'plt_einv') ? '55630' : '55640';
@@ -712,8 +719,7 @@ $reset = [
     'dt_created',
     'dt_updated',
     'zatca_pdf_link',
-    'erp_id',      // ← جديد
-    'odoo_invoice_id'   // ← جديد
+    'erp_id'       // ← لا يُنسخ لفاتورة المرتجع
 ];
 ```
 
@@ -723,7 +729,7 @@ $reset = [
 
 ### 1. `functions_lib/odoo.php`
 **التعديلات:**
-- ✅ إضافة فحص `erp_id` في `odoo_post()`
+- ✅ إضافة فحص `erp_id` في دالة إرسال الفاتورة (يُستدعى من `erp_post_invoice` → `odoo_post`)
 - ✅ مزامنة العميل تلقائياً إذا لم يكن موجود
 - ✅ إنشاء عميل جديد تلقائياً إذا كان `customer_id = 0`
 - ✅ حفظ `erp_id` للعميل والفاتورة
@@ -741,7 +747,7 @@ $reset = [
 
 **الغرض:** إنشاء فاتورة مرتجع (Credit Note) من فاتورة أصلية.
 
-**التعديل المطلوب:** إضافة `erp_id` و `odoo_invoice_id` إلى مصفوفة `$reset` حتى لا تُنسخ قيمتهما من الفاتورة الأصلية إلى فاتورة المرتجع. فاتورة المرتجع يجب أن تحصل على معرف جديد في Odoo.
+**التعديل المطلوب:** إضافة `erp_id` إلى مصفوفة `$reset` حتى لا تُنسخ قيمته من الفاتورة الأصلية إلى فاتورة المرتجع. فاتورة المرتجع يجب أن تحصل على معرف جديد في Odoo.
 
 **قبل التعديل:**
 ```php
@@ -750,7 +756,7 @@ $reset = ['einv_id','einv_date','uuid','create_by','update_by','dt_created','dt_
 
 **بعد التعديل:**
 ```php
-$reset = ['einv_id','einv_date','uuid','create_by','update_by','dt_created','dt_updated','zatca_pdf_link','erp_id','odoo_invoice_id'];
+$reset = ['einv_id','einv_date','uuid','create_by','update_by','dt_created','dt_updated','zatca_pdf_link','erp_id'];
 ```
 
 **الموقع في الملف:** السطر 35 تقريباً، داخل دالة `einv_return()`.
@@ -815,7 +821,7 @@ echo "Odoo ID: " . $client['erp_id'];
 ```php
 // إرسال فاتورة إيجار
 $einv_id = 1062;
-$result = odoo_post($einv_id, 'plt_einv');
+$result = erp_post_invoice($einv_id, 'plt_einv');
 print_r($result);
 
 // تحقق من erp_id في قاعدة البيانات
@@ -830,7 +836,7 @@ echo "Status Code: " . $invoice['acl_status_code']; // يجب أن يكون 5563
 // إنشاء فاتورة بدون customer_id
 // تأكد أن الفاتورة لها customer_ar على الأقل
 $einv_id = 1070; // فاتورة customer_id = 0
-$result = odoo_post($einv_id, 'plt_einv');
+$result = erp_post_invoice($einv_id, 'plt_einv');
 
 // يجب أن ينشئ عميل جديد تلقائياً
 print_r($result);
@@ -901,12 +907,13 @@ print_r($result);
 
 ## 📎 ملاحظات إضافية
 
-### التوافق مع نظام Multi-ERP
-يمكنك استخدام الدوال الموحدة من `erp.php` بدلاً من استدعاء Odoo مباشرة:
+### الدوال الموصى بها (نظام Multi-ERP)
+استخدم دوال `erp.php` في الكود الجديد:
 ```php
-erp_sync_client($client_id);      // بديل لـ odoo_sync_client
-erp_post_invoice($einv_id, 'plt_einv');  // بديل لـ odoo_post
+erp_sync_client($client_id);           // مزامنة عميل
+erp_post_invoice($einv_id, 'plt_einv'); // إرسال فاتورة (الاستخدام الحالي)
 ```
+الدوال `odoo_post()` و `odoo_sync_client()` لا تزال تعمل للتوافق مع الكود القديم.
 
 ### إعداد الاتصال بـ Odoo
 يتم جلب إعدادات الاتصال من جدول `mw_odoo_auth` أو `odoo_auth` (الحقول: `base_url`/`auth_host`, `token`, `api_key`).
