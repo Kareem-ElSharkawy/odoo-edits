@@ -674,12 +674,6 @@ if($do == 'erp_post_invoice') {
     }
     // ...
 }
-
-// Legacy Odoo actions → redirect to unified ERP handler
-if($do=='odoo_sync_invoice' || $do=='odoo_confirm' || $do=='odoo_post') {
-    require_once('functions_lib/lib/erp.php');
-    $json_callback = erp_post_invoice($id, 'plt_einv');
-}
 ```
 
 ---
