@@ -1,60 +1,22 @@
-# 🔗 دليل تكامل Odoo مع نظام سمات
-## Odoo Integration Guide for Simaat System
+# تكامل Odoo — مرجع رفع التعديلات
 
-> **آخر تحديث:** 23 فبراير 2026  
-> **الإصدار:** 2.1  
-> **الحالة:** جاهز للإنتاج ✅
+آخر تحديث: 23 فبراير 2026 | الإصدار 2.1
 
 ---
 
-## 📋 جدول المحتويات
+## نظرة عامة
 
-1. [نظرة عامة](#نظرة-عامة)
-2. [المتطلبات الأساسية](#المتطلبات-الأساسية)
-3. [خطوات التثبيت](#خطوات-التثبيت)
-4. [الوظائف المتاحة](#الوظائف-المتاحة)
-5. [الاستخدام](#الاستخدام)
-6. [أكواد الحالات](#أكواد-الحالات)
-7. [استكشاف الأخطاء](#استكشاف-الأخطاء)
-8. [الملفات المعدلة](#الملفات-المعدلة)
+- ربط سمات مع Odoo: مزامنة عملاء، إرسال فواتير، عقود/وحدات/أقساط.
+- إنشاء عميل تلقائي عند الحاجة؛ حفظ معرف Odoo في `erp_id`.
+- التحديث التلقائي: `acl_status_code` → 55630 (plt_einv) أو 55640 (scm_einv).
 
 ---
 
-## 🎯 نظرة عامة
+## المتطلبات
 
-### ما هو التكامل؟
-هذا التكامل يربط نظام سمات (Simaat) مع نظام Odoo ERP، مما يسمح بـ:
-- ✅ مزامنة بيانات العملاء تلقائياً
-- ✅ إرسال الفواتير إلى Odoo
-- ✅ مزامنة العقود والوحدات والأقساط
-- ✅ إنشاء عملاء جدد تلقائياً عند الحاجة
-- ✅ حفظ معرفات Odoo في الحقل الموحد `erp_id`
+- PHP 7.4+, MySQL 5.7+, cURL, JSON.
 
-### كيف يعمل؟
-```
-┌─────────────┐         ┌──────────────┐         ┌─────────────┐
-│   Simaat    │ ──────► │ Odoo API     │ ──────► │    Odoo     │
-│  (Invoice)  │  POST   │ Integration  │  Sync   │    ERP      │
-└─────────────┘         └──────────────┘         └─────────────┘
-       │                                                  │
-       │ ◄────────────── erp_id ────────────────────┘
-       │                (Save ID back)
-       ▼
-  Update Status
-   (55630/55640)
-```
-
----
-
-## 🔧 المتطلبات الأساسية
-
-### 1. البيئة التقنية
-- ✅ PHP 7.4+
-- ✅ MySQL 5.7+
-- ✅ cURL enabled
-- ✅ JSON extension
-
-### 2. معلومات الاتصال بـ Odoo
+### إعدادات Odoo
 ```php
 // في ملف الإعدادات (config أو odoo.php)
 $odoo_api_url = 'http://88.223.92.71:3050';
@@ -62,26 +24,15 @@ $odoo_username = 'your_username';
 $odoo_api_key = 'your_api_key';
 ```
 
-### 3. الجداول المطلوبة
-يجب أن تكون الجداول التالية موجودة:
-- **`erp_integrations`** — إعدادات الاتصال بـ ERP (Odoo/SAP)؛ يُنشأ من الـ SQL في الدليل.
-- `res_client` - العملاء
-- `plt_einv` - الفواتير الإلكترونية (إيجارات)
-- `scm_einv` - الفواتير الإلكترونية (صيانة/مبيعات)
-- `plt_prop` / `acc_property` - العقارات
-- `plt_are` / `acc_unit` - الوحدات
-- `plt_tts` - العقود
-- `plt_tmt` - الأقساط/المستحقات
-
-**ملاحظة:** إذا لم يوجد جدول `mw_odoo_auth` أو `odoo_auth`، يتم الاعتماد على `erp_integrations` (السجل الذي `provider = 'odoo'` و `active = 1`).
+### الجداول
+`erp_integrations` (إلزامي — إعدادات ERP). إن لم يوجد `mw_odoo_auth`/`odoo_auth` يُستخدم السجل من `erp_integrations` حيث `provider='odoo'` و `active=1`.  
+باقي الجداول: `res_client`, `plt_einv`, `scm_einv`, `plt_prop`/`acc_property`, `plt_are`/`acc_unit`, `plt_tts`, `plt_tmt`.
 
 ---
 
-## 🚀 خطوات التثبيت
+## التثبيت (مرة واحدة)
 
-### الخطوة 1️⃣: إضافة حقل `erp_id` لقاعدة البيانات
-
-قم بتشغيل السكريبت التالي **مرة واحدة فقط**:
+### 1. إضافة `erp_id`
 
 #### إضافة حقول `erp_id` (SQL)
 
@@ -131,19 +82,12 @@ ALTER TABLE `res_client` ADD INDEX `idx_erp_id` (`erp_id`);
 ALTER TABLE `plt_einv` ADD INDEX `idx_erp_id` (`erp_id`);
 ALTER TABLE `scm_einv` ADD INDEX `idx_erp_id` (`erp_id`);
 
--- ✅ تم بنجاح!
-SELECT 'Setup completed successfully!' AS Status;
 ```
 
-**⚠️ ملاحظة:** إذا كانت بعض الجداول لا تحتوي على الأعمدة المذكورة بعد `AFTER`، قم بحذف جزء `AFTER` من الأمر.
+إذا كان العمود المذكور بعد `AFTER` غير موجود في الجدول، احذف جزء `AFTER` من الأمر.
 
-#### جدول إعدادات التكامل `erp_integrations`
-
-جدول **إلزامي** لحفظ إعدادات الاتصال بأنظمة ERP (Odoo، SAP، Dynamics). نظام Multi-ERP و `odoo_check()` يقرؤون منه عند عدم وجود `mw_odoo_auth` أو `odoo_auth`.
-
-**الاستخدام في الكود:**
-- `ERP_Factory.php`: اختيار النظام النشط (`active = 1`)، تحميل الإعدادات.
-- `odoo.php`: عند غياب `odoo_auth` يتم استخدام السجل من `erp_integrations` حيث `provider = 'odoo'`.
+#### جدول `erp_integrations`
+إلزامي. إعدادات الاتصال (Odoo/SAP). يُقرأ من `ERP_Factory` و `odoo.php` عند غياب `mw_odoo_auth`/`odoo_auth`.
 
 **إنشاء الجدول:**
 
@@ -184,20 +128,11 @@ INSERT INTO `erp_integrations` (
 );
 ```
 
-**توضيح الحقول لـ Odoo:**
-
-| الحقل | الاستخدام |
-|-------|-----------|
-| `provider` | `odoo` — يحدد أن السجل لـ Odoo |
-| `erp_api_url` | عنوان قاعدة Odoo (مثل `http://88.223.92.71:3050`) |
-| `api_secret` | Token أو API Key للمصادقة (يُرسل كـ Bearer و X-API-Key) |
-| `active` | `1` = هذا الربط هو النشط؛ يُفضّل أن يكون ربط Odoo واحد فقط نشط |
+لـ Odoo: `provider='odoo'`, `erp_api_url` = عنوان القاعدة، `api_secret` = Token/API Key، `active=1`.
 
 ---
 
-#### جدول سجلات التكامل `erp_integ_log`
-
-شغّل الـ SQL التالي لإنشاء جدول السجلات:
+#### جدول `erp_integ_log`
 
 ```sql
 -- جدول سجلات التكامل مع ERP
@@ -221,9 +156,7 @@ CREATE TABLE IF NOT EXISTS `erp_integ_log` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 ```
 
-#### مفاتيح اللغة `erp_lang_keys`
-
-شغّل الـ SQL التالي لإضافة مفاتيح اللغة (يتطلب جدول `lang` بهيكل: `lang_code`, `lang_ar`, `lang_en`):
+#### مفاتيح اللغة `erp_lang_keys` (جدول `lang`: `lang_code`, `lang_ar`, `lang_en`)
 
 ```sql
 -- مفاتيح اللغة لـ Odoo و ERP
@@ -260,575 +193,114 @@ ALTER TABLE `plt_tmt` ADD COLUMN `erp_id` INT(11) NULL;
 
 ---
 
-### الخطوة 2️⃣: التحقق من الملفات المطلوبة
+### 2. الملفات المطلوبة
 
-تأكد من وجود الملفات التالية:
+- `functions_lib/`: `odoo.php`, `erp.php`, `ERP_Odoo.php`, `acc.php`, `lib/erp/`
+- `functions_libX/`: `odoo.php`, `acc.php`
+- `plt_einv.php`
+- اختياري: `setup_erp_system.sql`, `admin_erp_settings.php`
 
-```
-your-project/
-├── functions_lib/
-│   ├── odoo.php              ← الملف الرئيسي (تكامل Odoo)
-│   ├── erp.php               ← دوال ERP الموحدة (erp_log, erp_save_log)
-│   ├── ERP_Odoo.php          ← كلاس Odoo لنظام Multi-ERP
-│   ├── acc.php               ← يحتوي على einv_return
-│   ├── erp_integ_log.sql     ← جدول سجلات التكامل
-│   ├── erp_lang_keys.sql     ← مفاتيح اللغة للرسائل
-│   └── lib/erp/              ← مكتبة ERP (Factory, Interface, Functions)
-├── functions_libX/
-│   ├── odoo.php              ← نسخة احتياطية
-│   └── acc.php               ← نسخة احتياطية
-├── setup_erp_system.sql      ← إعداد sys_config و erp_integ_log (لـ Multi-ERP)
-├── admin_erp_settings.php    ← لوحة إعدادات ERP (اختياري)
-└── functions/
-    ├── connect.php           ← اتصال قاعدة البيانات
-    └── functions.php         ← الوظائف الأساسية
-```
-
-#### ملفات SQL للتنفيذ (مرة واحدة):
-| الملف | الغرض |
-|-------|-------|
-| `functions_lib/erp_integ_log.sql` | إنشاء جدول سجلات التكامل `erp_integ_log` |
-| `functions_lib/erp_lang_keys.sql` | إضافة مفاتيح اللغة لرسائل Odoo و ERP |
-| `setup_erp_system.sql` | إعداد sys_config و erp_integ_log (لنظام Multi-ERP) |
+SQL للتنفيذ مرة واحدة: محتوى `erp_integ_log`, `erp_lang_keys`, و SQL حقول `erp_id` (موجود أعلاه في الدليل).
 
 ---
 
-## 📚 الوظائف المتاحة
+## الدوال
 
-### 1️⃣ مزامنة العملاء - `odoo_sync_client()`
-
+### مزامنة عميل — `odoo_sync_client($client_id)`
 ```php
-/**
- * مزامنة بيانات عميل مع Odoo
- * Sync client data with Odoo
- * 
- * @param int $client_id - معرف العميل
- * @param int $auth_id - معرف المستخدم (اختياري)
- * @return array - النتيجة
- */
 $result = odoo_sync_client(80);
-
-// النتيجة
-[
-    'status' => 'OK',
-    'info' => 'Client synced successfully',
-    'odoo_id' => 67,  // معرف Odoo
-    'operation' => 'created' // أو 'updated'
-]
+// ['status'=>'OK', 'odoo_id'=>67, 'operation'=>'created'|'updated']
 ```
 
-**مثال الاستخدام:**
+### إرسال فاتورة — `erp_post_invoice($einv_id, $table)` (الموصى به)
 ```php
-$client_id = 80;
-$result = odoo_sync_client($client_id);
-
-if ($result['status'] == 'OK') {
-    echo "تم المزامنة! Odoo ID: " . $result['odoo_id'];
-} else {
-    echo "خطأ: " . $result['info'];
-}
-```
-
----
-
-### 2️⃣ إرسال الفواتير - `erp_post_invoice()`
-
-**الدالة الموصى بها** لإرسال الفاتورة إلى نظام ERP النشط (Odoo أو غيره). تعمل مع أي نظام مفعّل من جدول `erp_integrations`.
-
-```php
-/**
- * إرسال فاتورة إلى ERP (Odoo عند تفعيله)
- * Post invoice to ERP
- * 
- * @param int $einv_id - معرف الفاتورة
- * @param string $table - اسم الجدول (plt_einv أو scm_einv)
- * @param int $auth_id - اختياري
- * @return array - النتيجة
- */
 $result = erp_post_invoice(1062, 'plt_einv');
-
-// النتيجة
-[
-    'status' => 'OK',
-    'info' => '...',
-    'erp_id' => 31,        // معرف الفاتورة في ERP
-    'odoo_id' => 31,       // نفس القيمة عند استخدام Odoo
-    'invoice_number' => 'INV/2026/0031'
-]
+// ['status'=>'OK', 'erp_id'=>31, 'odoo_id'=>31, 'invoice_number'=>'...']
 ```
+`odoo_post($einv_id, $table)` لا يزال يعمل (توافق قديم).
 
-**مثال الاستخدام:**
-```php
-$einv_id = 1062;
-$table = 'plt_einv';  // أو 'scm_einv'
-
-$result = erp_post_invoice($einv_id, $table);
-
-if ($result['status'] == 'OK') {
-    echo "تم إرسال الفاتورة! ERP ID: " . ($result['erp_id'] ?? $result['odoo_id']);
-} else {
-    echo "خطأ: " . $result['info'];
-}
-```
-
-**للتوافق مع الكود القديم:** `odoo_post($einv_id, $table)` لا يزال يعمل ويستدعي نفس المنطق عبر `erp_post_invoice`.
+### باقي الدوال
+- `odoo_sync_property($are_id)` — عقار
+- `odoo_sync_unit($are_id)` — وحدة
+- `odoo_sync_contract($tts_id)` — عقد
+- `odoo_sync_installment($tmt_id)` — قسط
+- `odoo_confirm($einv_id, 'plt_einv', 'plt_einv_line')` — يستدعي `erp_post_invoice` داخلياً
 
 ---
 
-### 3️⃣ مزامنة العقار - `odoo_sync_property()`
+## سيناريوهات سريعة
 
-```php
-// المعامل: are_id (معرف العقار في plt_prop)
-$result = odoo_sync_property($are_id);
-```
+**فاتورة لها عميل:** `erp_post_invoice($einv_id, 'plt_einv')` — يتحقق من `erp_id` عميل، يزامن إن لزم، يرسل، يحدّث `erp_id` و `acl_status_code`.
 
----
+**فاتورة بدون عميل (customer_id=0):** النظام ينشئ عميلاً من بيانات الفاتورة ويزامنه ثم يرسل الفاتورة. مطلوب `customer_ar` على الأقل.
 
-### 4️⃣ مزامنة الوحدة - `odoo_sync_unit()`
-
-```php
-// المعامل: are_id (معرف الوحدة في plt_are أو plt_prop)
-$result = odoo_sync_unit($are_id);
-```
+**مرتجع (Credit Note):** `einv_return()` لا ينسخ `erp_id` (موجود في `$reset`). فاتورة المرتجع تأخذ `erp_id` جديد عند الإرسال.
 
 ---
 
-### 5️⃣ مزامنة العقد - `odoo_sync_contract()`
+## أكواد الحالات
 
-```php
-// المعامل: tts_id (معرف العقد في plt_tts)
-$result = odoo_sync_contract($tts_id);
-```
+| الكود | الاستخدام |
+|------|-----------|
+| 44110 | مسودة |
+| 44115 | جاهزة لـ ZATCA |
+| 44120 | مؤكدة |
+| 44140, 53840 | قديم — لا تستخدم |
+| 55630 | plt_einv مرتبط Odoo |
+| 55640 | scm_einv مرتبط Odoo |
 
----
-
-### 6️⃣ مزامنة القسط - `odoo_sync_installment()`
-
-```php
-// المعامل: tmt_id (معرف القسط/المستحق في plt_tmt)
-$result = odoo_sync_installment($tmt_id);
-```
+عند نجاح الإرسال: يُحدَّث `erp_id` و `acl_status_code` في الجدول.
 
 ---
 
-### 7️⃣ تأكيد وإرسال الفاتورة - `odoo_confirm()`
+## استكشاف الأخطاء
 
-```php
-// يستدعي odoo_post/erp_post_invoice داخلياً
-$result = odoo_confirm($einv_id, 'plt_einv', 'plt_einv_line');
-// أو استخدم مباشرة:
-$result = erp_post_invoice($einv_id, 'plt_einv');
-```
-
----
-
-## 🎯 الاستخدام
-
-### سيناريو 1: إرسال فاتورة لعميل موجود
-
-```php
-// الفاتورة لها عميل (customer_id موجود)
-$einv_id = 1062;
-$result = erp_post_invoice($einv_id, 'plt_einv');
-
-// النظام سيفعل:
-// 1. يتحقق من وجود erp_id للعميل
-// 2. إذا لم يكن موجود، يسينك العميل أولاً
-// 3. يرسل الفاتورة
-// 4. يحفظ erp_id للفاتورة
-// 5. يحدث الحالة إلى 55630 (plt_einv) أو 55640 (scm_einv)
-```
+- **No Fields Found:** غائب `erp_id` — نفّذ SQL الحقول وأضف في `acl_field` إن لزم.
+- **Invalid entity_type:** مقبول `individual` / `company`؛ الكود يصلح charity/organization → company.
+- **Invalid entity_idtype:** مقبول nid, iqama, passport, cr؛ افتراضي nid.
+- **Invalid cal_type:** مقبول cal_gr, cal_hj؛ افتراضي cal_gr.
+- **Partner Simat ID 0:** النظام ينشئ عميلاً من الفاتورة؛ مطلوب `customer_ar`.
+- **مرتجع نفس erp_id:** `erp_id` مضاف لـ `$reset` في `einv_return()` (acc.php / acc.phpX).
 
 ---
 
-### سيناريو 2: إرسال فاتورة بدون عميل (customer_id = 0)
+## الملفات المعدلة
+
+**odoo.php (و odoo.php في libX):** فحص/مزامنة عميل، إنشاء عميل عند customer_id=0، حفظ erp_id، تحديث acl_status_code (55630/55640)، معالجة استجابات API، تصحيح entity_type/entity_idtype/cal_type، استخدام erp_log بدل error_log.
+
+**acc.php (و libX):** في `einv_return()` أضف `erp_id` إلى `$reset` حتى لا يُنسخ للمرتجع.
+
+**plt_einv.php:** عند `$do == 'erp_post_invoice'` استدعاء `erp_post_invoice($id, 'plt_einv')` بعد تحميل `functions_lib/lib/erp.php`. الإبقاء على `odoo_test` للاختبار.
 
 ```php
-// الفاتورة ليس لها عميل
-$einv_id = 1070;
-$result = erp_post_invoice($einv_id, 'plt_einv');
-
-// النظام سيفعل:
-// 1. يكتشف أن customer_id = 0
-// 2. ينشئ عميل جديد تلقائياً من بيانات الفاتورة:
-//    - الاسم من customer_ar
-//    - الاسم بالإنجليزي من customer_en
-//    - الرقم الضريبي من customer_vat
-//    - الجوال من customer_mobile
-// 3. يسينك العميل الجديد مع Odoo
-// 4. يربط الفاتورة بالعميل الجديد
-// 5. يرسل الفاتورة
-// 6. يحفظ erp_id
-```
-
-**⚠️ ملاحظة:** الفاتورة يجب أن تحتوي على `customer_ar` (اسم العميل) على الأقل، وإلا ستفشل العملية.
-
----
-
-### سيناريو 3: فاتورة مرتجع (Credit Note)
-
-```php
-// إنشاء فاتورة مرتجع
-$original_einv_id = 1062;
-$return_data = einv_return($original_einv_id, 'plt_einv');
-
-// النظام سيفعل:
-// 1. ينسخ بيانات الفاتورة الأصلية
-// 2. لا ينسخ erp_id (يبقى NULL)
-// 3. عند إرسال فاتورة المرتجع لـ Odoo، سيأخذ معرف جديد
-```
-
----
-
-## 📊 أكواد الحالات (Status Codes)
-
-### حالات الفواتير
-
-| الكود | الحالة | الوصف | الاستخدام |
-|------|--------|-------|-----------|
-| `44110` | مسودة | Draft | الفاتورة قيد الإنشاء |
-| `44115` | جاهزة للإرسال | Ready | جاهزة لإرسالها لـ ZATCA |
-| `44120` | مؤكدة | Confirmed/Posted | تم تأكيدها في النظام |
-| `44140` | ❌ قديم | Synced (Old) | **لا تستخدم** |
-| `53840` | ❌ قديم | Synced (Old) | **لا تستخدم** |
-| `55630` | ✅ مرتبطة بـ Odoo | Synced (plt_einv) | **استخدم هذا لـ plt_einv** |
-| `55640` | ✅ مرتبطة بـ Odoo | Synced (scm_einv) | **استخدم هذا لـ scm_einv** |
-
-### كيف يتم التحديث تلقائياً؟
-
-```php
-// عند نجاح erp_post_invoice / odoo_post:
-if ($response['status'] == 'OK' && !empty($odoo_invoice_id)) {
-    // تحديد كود الحالة المناسب
-    $acl_status_code = ($table == 'plt_einv') ? '55630' : '55640';
-    
-    // التحديث
-    @jitquery("
-        UPDATE `$table`
-        SET
-            `erp_id` = '$odoo_invoice_id',
-            `acl_status_code` = '$acl_status_code',
-            `dt_updated` = UNIX_TIMESTAMP()
-        WHERE `einv_id` = '$einv_id'
-    ", -1);
-}
-```
-
----
-
-## 🔍 استكشاف الأخطاء
-
-### المشكلة 1: "No Fields Found in Update Function"
-
-**السبب:** الحقل `erp_id` غير موجود في قاعدة البيانات أو في `acl_field`.
-
-**الحل:** تأكد من تنفيذ SQL إضافة حقل `erp_id` للجداول وإضافة السجل في `acl_field` إن لزم.
-
----
-
-### المشكلة 2: "Invalid value for entity_type"
-
-**السبب:** قيمة `entity_type` في جدول `res_client` غير مقبولة في Odoo.
-
-**القيم المقبولة:**
-- `individual` - فرد
-- `company` - شركة
-
-**الحل:** النظام يصلح هذا تلقائياً الآن:
-```php
-// في odoo_sync_client()
-if ($entity_type == 'charity' || $entity_type == 'organization') {
-    $entity_type = 'company';
-} else {
-    $entity_type = 'individual';
-}
-```
-
----
-
-### المشكلة 3: "Invalid value for entity_idtype"
-
-**السبب:** قيمة `entity_idtype` غير مقبولة.
-
-**القيم المقبولة:**
-- `nid` - الهوية الوطنية
-- `iqama` - الإقامة
-- `passport` - جواز السفر
-- `cr` - السجل التجاري
-
-**الحل:** النظام يصلح هذا تلقائياً:
-```php
-if (!in_array($entity_idtype, ['nid', 'iqama', 'passport', 'cr'])) {
-    $entity_idtype = 'nid'; // افتراضي
-}
-```
-
----
-
-### المشكلة 4: "Invalid value for cal_type"
-
-**السبب:** قيمة `cal_type` غير مقبولة.
-
-**القيم المقبولة:**
-- `cal_gr` - ميلادي (Gregorian)
-- `cal_hj` - هجري (Hijri)
-
-**الحل:** النظام يصلح هذا تلقائياً:
-```php
-$cal_type = $client['cal_type'] ?? 'cal_gr';
-if (!in_array($cal_type, ['cal_gr', 'cal_hj'])) {
-    $cal_type = 'cal_gr'; // افتراضي: ميلادي
-}
-```
-
----
-
-### المشكلة 5: "Partner with Simat ID 0 not found"
-
-**السبب:** الفاتورة ليس لها عميل (`customer_id = 0`).
-
-**الحل:** النظام ينشئ عميل تلقائياً الآن من بيانات الفاتورة.
-
-**المتطلب:** الفاتورة يجب أن تحتوي على:
-- `customer_ar` (اسم العميل بالعربي) - **إجباري**
-- `customer_en` (اسم العميل بالإنجليزي) - اختياري
-- `customer_vat` (الرقم الضريبي) - اختياري
-- `customer_mobile` (الجوال) - اختياري
-
----
-
-### المشكلة 6: فاتورة المرتجع تأخذ نفس `erp_id`
-
-**السبب:** كان الحقل يُنسخ في `einv_return()`.
-
-**الحل:** تم إضافة `erp_id` لقائمة `$reset` في جميع ملفات `einv_return`:
-```php
-$reset = [
-    'einv_id',
-    'einv_date',
-    'uuid',
-    'create_by',
-    'update_by',
-    'dt_created',
-    'dt_updated',
-    'zatca_pdf_link',
-    'erp_id'       // ← لا يُنسخ لفاتورة المرتجع
-];
-```
-
----
-
-## 🗂️ الملفات المعدلة
-
-### 1. `functions_lib/odoo.php`
-**التعديلات:**
-- ✅ إضافة فحص `erp_id` في دالة إرسال الفاتورة (يُستدعى من `erp_post_invoice` → `odoo_post`)
-- ✅ مزامنة العميل تلقائياً إذا لم يكن موجود
-- ✅ إنشاء عميل جديد تلقائياً إذا كان `customer_id = 0`
-- ✅ حفظ `erp_id` للعميل والفاتورة
-- ✅ تحديث `acl_status_code` إلى `55630` (plt_einv) أو `55640` (scm_einv)
-- ✅ معالجة صيغ مختلفة من استجابات Odoo API
-- ✅ Validation تلقائي لـ `entity_type`, `entity_idtype`, `cal_type`
-- ✅ استخدام `erp_log()` بدلاً من `error_log` (للمراسلات المهمة فقط)
-
-### 2. `functions_libX/odoo.php`
-نفس التعديلات في الملف الاحتياطي.
-
-### 3. `functions_lib/acc.php`
-
-**الوظيفة المعدّلة:** `einv_return($einv_id, $table, $table_line)`
-
-**الغرض:** إنشاء فاتورة مرتجع (Credit Note) من فاتورة أصلية.
-
-**التعديل المطلوب:** إضافة `erp_id` إلى مصفوفة `$reset` حتى لا تُنسخ قيمته من الفاتورة الأصلية إلى فاتورة المرتجع. فاتورة المرتجع يجب أن تحصل على معرف جديد في Odoo.
-
-**قبل التعديل:**
-```php
-$reset = ['einv_id','einv_date','uuid','create_by','update_by','dt_created','dt_updated','zatca_pdf_link'];
-```
-
-**بعد التعديل:**
-```php
-$reset = ['einv_id','einv_date','uuid','create_by','update_by','dt_created','dt_updated','zatca_pdf_link','erp_id'];
-```
-
-**الموقع في الملف:** السطر 35 تقريباً، داخل دالة `einv_return()`.
-
-### 4. `functions_libX/acc.php`
-نفس التعديل في دالة `einv_return()`.
-
-### 5. `plt_einv.php`
-
-**التعديلات:**
-- ✅ إضافة action **`erp_post_invoice`** في بداية الصفحة: عند `$do == 'erp_post_invoice'` يتم استدعاء `erp_post_invoice($id, 'plt_einv')` بعد تحميل `functions_lib/lib/erp.php`.
-- ✅ توحيد actions القديمة: عند `$do == 'odoo_sync_invoice'` أو `odoo_confirm` أو `odoo_post` يتم التوجيه إلى `erp_post_invoice($id, 'plt_einv')` بدلاً من استدعاء Odoo مباشرة.
-- ✅ الإبقاء على `$do == 'odoo_test'` لاختبار الاتصال.
-
-**مقتطف الكود:**
-```php
-// ERP POST INVOICE - Handle FIRST
 if($do == 'erp_post_invoice') {
     require_once('functions_lib/lib/erp.php');
     if (function_exists('erp_post_invoice')) {
         $json_callback = erp_post_invoice($id, 'plt_einv');
     }
-    // ...
 }
 ```
 
 ---
 
-## 📝 سجلات النظام (Logs)
+## السجلات
 
-### نظام التسجيل
-يستخدم التكامل دالة **`erp_log()`** للتسجيل (من `functions_lib/erp.php`)، و**`erp_save_log()`** لحفظ السجلات في جدول `erp_integ_log`.
-
-### كيف تفحص السجلات؟
-
-```bash
-# السجلات تظهر في error_log (erp_log يستخدم error_log)
-# Linux/Mac
-tail -f /path/to/error_log
-
-# Windows (Laragon)
-tail -f C:\laragon\www\logs\error.log
-```
-
-### استعلام سجلات قاعدة البيانات
-
-```sql
--- آخر عمليات التكامل
-SELECT * FROM erp_integ_log 
-WHERE provider = 'odoo' 
-ORDER BY dt_created DESC LIMIT 50;
-```
-
-### نموذج لسجل ناجح (erp_log):
-
-```log
-ERP[ODOO]: SYNC [client #164] create → success (odoo_id=69)
-ERP[ODOO]: Client #164 synced (erp_id=69)
-ERP[ODOO]: Invoice #1070 synced (erp_id=43)
-```
+`erp_log()` و `erp_save_log()` — السجلات في error_log وجدول `erp_integ_log`. استعلام: `SELECT * FROM erp_integ_log WHERE provider='odoo' ORDER BY dt_created DESC LIMIT 50`.
 
 ---
 
-## ✅ الاختبار النهائي
+## تحقق بعد الرفع
 
-### 1. اختبار مزامنة عميل:
-
-```php
-// اختبار عميل موجود
-$client_id = 80;
-$result = odoo_sync_client($client_id);
-print_r($result);
-
-// تحقق من erp_id في قاعدة البيانات
-$client = jitquery_array(NULL, "`res_client` WHERE `client_id`='$client_id'", -1);
-echo "Odoo ID: " . $client['erp_id'];
-```
-
-### 2. اختبار إرسال فاتورة:
-
-```php
-// إرسال فاتورة إيجار
-$einv_id = 1062;
-$result = erp_post_invoice($einv_id, 'plt_einv');
-print_r($result);
-
-// تحقق من erp_id في قاعدة البيانات
-$invoice = jitquery_array(NULL, "`plt_einv` WHERE `einv_id`='$einv_id'", -1);
-echo "Odoo Invoice ID: " . $invoice['erp_id'];
-echo "Status Code: " . $invoice['acl_status_code']; // يجب أن يكون 55630
-```
-
-### 3. اختبار فاتورة بدون عميل:
-
-```php
-// إنشاء فاتورة بدون customer_id
-// تأكد أن الفاتورة لها customer_ar على الأقل
-$einv_id = 1070; // فاتورة customer_id = 0
-$result = erp_post_invoice($einv_id, 'plt_einv');
-
-// يجب أن ينشئ عميل جديد تلقائياً
-print_r($result);
-```
+- مزامنة عميل: `odoo_sync_client(80)` ثم التحقق من `res_client.erp_id`.
+- إرسال فاتورة: `erp_post_invoice(1062, 'plt_einv')` ثم التحقق من `plt_einv.erp_id` و `acl_status_code` = 55630.
+- اتصال: `odoo_test()` أو `odoo_request('api/simat/cost-centers/list', 'GET', [])`.
 
 ---
 
-## 🎓 نصائح مهمة
+## ملاحظات
 
-### ✅ افعل:
-- ✔️ نفّذ سكربتات SQL (erp_id، erp_integ_log، erp_integrations) مرة واحدة
-- ✔️ تابع سجلات التكامل (`erp_integ_log` و `erp_log` في error_log)
-- ✔️ اختبر على بيانات تجريبية أولاً
-- ✔️ احفظ نسخة احتياطية من قاعدة البيانات قبل التعديلات
-
-### ❌ لا تفعل:
-- ✘ لا تعدل قيم `erp_id` يدوياً في قاعدة البيانات
-- ✘ لا تحذف الحقل `erp_id` بعد الإعداد
-- ✘ لا تستخدم أكواد الحالة القديمة (`44140`, `53840`)
-- ✘ لا تنسخ `erp_id` بين السجلات
-
----
-
-## 📞 الدعم
-
-### إذا واجهت مشكلة:
-
-1. **افحص السجلات أولاً:**
-   ```bash
-   tail -f error_log
-   ```
-
-2. **تحقق من قاعدة البيانات:**
-   ```sql
-   -- تحقق من وجود الحقل
-   SHOW COLUMNS FROM res_client LIKE 'erp_id';
-   
-   -- تحقق من البيانات
-   SELECT client_id, entity_name, erp_id FROM res_client WHERE client_id = 80;
-   ```
-
-3. **اختبر الاتصال بـ Odoo:**
-   ```php
-   $result = odoo_test();  // أو odoo_request('api/simat/cost-centers/list', 'GET', []);
-   print_r($result);
-   ```
-
----
-
-## 🎉 الخلاصة
-
-بعد إتمام هذه الخطوات، سيكون لديك:
-
-- ✅ نظام متكامل مع Odoo ERP
-- ✅ مزامنة تلقائية للعملاء والفواتير
-- ✅ إنشاء تلقائي للعملاء عند الحاجة
-- ✅ حفظ معرفات Odoo في حقل موحد
-- ✅ تحديث تلقائي لأكواد الحالات
-- ✅ معالجة قوية للأخطاء
-
----
-
-**تم بحمد الله! 🚀**
-
-> إذا كانت لديك أي أسئلة أو مشاكل، راجع قسم [استكشاف الأخطاء](#استكشاف-الأخطاء) أو افحص سجلات النظام.
-
----
-
-## 📎 ملاحظات إضافية
-
-### الدوال الموصى بها (نظام Multi-ERP)
-استخدم دوال `erp.php` في الكود الجديد:
-```php
-erp_sync_client($client_id);           // مزامنة عميل
-erp_post_invoice($einv_id, 'plt_einv'); // إرسال فاتورة (الاستخدام الحالي)
-```
-الدوال `odoo_post()` و `odoo_sync_client()` لا تزال تعمل للتوافق مع الكود القديم.
-
-### إعداد الاتصال بـ Odoo
-يتم جلب إعدادات الاتصال من جدول `mw_odoo_auth` أو `odoo_auth` (الحقول: `base_url`/`auth_host`, `token`, `api_key`).
+- الدوال الموصى بها: `erp_post_invoice()`, `erp_sync_client()`. `odoo_post()` و `odoo_sync_client()` تعمل للتوافق.
+- الإعداد: من `mw_odoo_auth` أو `odoo_auth` أو `erp_integrations` (provider=odoo, active=1).
 
 
 
